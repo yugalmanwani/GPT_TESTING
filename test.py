@@ -1,12 +1,12 @@
-import torch
+from torch import cuda, bfloat16
 import transformers
 
-device = f'cuda:{torch.cuda.current_device()}' if torch.cuda.is_available() else 'cpu'
+device = f'cuda:{cuda.current_device()}' if cuda.is_available() else 'cpu'
 
 model = transformers.AutoModelForCausalLM.from_pretrained(
     'mosaicml/mpt-7b-instruct',
     trust_remote_code=True,
-    torch_dtype=torch.bfloat16,
+    torch_dtype=bfloat16,
     max_seq_len=2048
 )
 model.eval()
@@ -18,19 +18,21 @@ tokenizer = transformers.AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b"
 
 
 
+import torch
+from transformers import StoppingCriteria, StoppingCriteriaList
+
 # mtp-7b is trained to add "<|endoftext|>" at the end of generations
 stop_token_ids = tokenizer.convert_tokens_to_ids(["<|endoftext|>"])
 
 # define custom stopping criteria object
-class StopOnTokens(transformers.StoppingCriteria):
+class StopOnTokens(StoppingCriteria):
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
         for stop_id in stop_token_ids:
             if input_ids[0][-1] == stop_id:
                 return True
         return False
 
-stopping_criteria = transformers.StoppingCriteriaList([StopOnTokens()])
-
+stopping_criteria = StoppingCriteriaList([StopOnTokens()])
 
 
 generate_text = transformers.pipeline(
